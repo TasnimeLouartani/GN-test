@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Narbonne Dashboard</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- React & ReactDOM (UMD for standalone) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel Standalone (to compile JSX in browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Fade In Animation for Modal */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+  }
+}
+</script>
+</head>
+<body>
+  <!-- Bandeau d'information financement -->
+<div class="w-full text-center py-2 bg-slate-100 text-slate-700 text-sm font-medium shadow-sm">
+    Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la Recherche au titre du plan France 2030 portant la référence 22-PEVD-0002
+</div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Destructure React hooks for easier usage
+        const { useState, useEffect, useRef } = React;
+
+        /*******************************************************
+         * 1. CONSTANTS & CONFIGURATION
+         *******************************************************/
+        const COLORS = {
+            green: '#77dd77', // Pastel green
+            red: '#f05757',   // Red
+            blue: '#2aa1bc',
+            textMedium: '#64748b',
+            bgLight: '#f8f9fa',
+        };
+
+        const DEFAULT_INDICATORS = [
+            // --- ENVIRONNEMENTAUX ---
+            {
+                key: "sols",
+                category: "env",
+                name: "Consommation ENAF (2021-présent)",
+                short: "Usages Sols",
+                unit: "ha",
+                value: 1012,
+                target: 506,
+                type: "lower",
+                icon: "fa-solid fa-map-location-dot text-amber-600",
+                note: "Consommation ENAF de la collectivité sur 2021-2030. Cible: Moitié de la consommation observée sur 2011-2020 (Loi ZAN). Données: OCS Grand Narbonne.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "biodiv",
+                category: "env",
+                name: "Espaces semi-naturels (<25%)",
+                short: "Biodiversité",
+                unit: "%",
+                value: 38,
+                target: 0,
+                type: "lower",
+                icon: "fa-solid fa-leaf text-green-600",
+                note: "Proportion de points avec une proportion d'espaces (semi)-naturels dans le km² environnant inférieure à 25%. Cible: 0% (Rockström et al. 2023). Données: OCS Grand Narbonne.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "climat",
+                category: "env",
+                name: "Émissions GES par habitant",
+                short: "Climat",
+                unit: "tCO₂eq/hab",
+                value: 6.42,
+                target: 6.27,
+                type: "lower",
+                icon: "fa-solid fa-earth-europe text-blue-500",
+                note: "Émissions annuelles de Gaz à Effet de Serre par habitants. Données ORCEO 2022. Cible 1: 6.27 (SNBC2 selon population). Cible 2 (2050): 1.85.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "eau",
+                category: "env",
+                name: "Cycle de l’eau douce",
+                short: "Eau Douce",
+                unit: "% écart",
+                value: 52,
+                target: 20,
+                type: "lower",
+                icon: "fa-solid fa-droplet text-cyan-500",
+                note: "Écart débit vs naturel (Hiver 52%, Été 36%). Cible: <20% (Rockström et al. 2023). Valeur: DRIAS explore2 orchidee CNRM-CM5_ALADIN63 historiques (1950-1960) et présents (2020-2030 scénario rcp4.5).",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "azote",
+                category: "env",
+                name: "Risque Eutrophisation (Azote)",
+                short: "Azote",
+                unit: "% mesures",
+                value: 6,
+                target: 0,
+                type: "lower",
+                icon: "fa-solid fa-triangle-exclamation text-yellow-500",
+                note: "Proportion de mesures présentant un risque d'eutrophisation (≥2.5mgN/L). Données Naïades (2022-2025). Cible: Pas de mesure présentant des risques.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "phosphore",
+                category: "env",
+                name: "Risque Eutrophisation (Phosphore)",
+                short: "Phosphore",
+                unit: "% mesures",
+                value: 21,
+                target: 0,
+                type: "lower",
+                icon: "fa-solid fa-flask text-purple-500",
+                note: "Proportion de mesures présentant un risque d'eutrophisation (≥0.1mgP/L). Données Naïades (2022-2025). Cible: Pas de mesure présentant des risques.",
+                isHidden: false,
+                images: []
+            },
+
+            // --- SOCIO-ÉCONOMIQUES ---
+            {
+                key: "demographie",
+                category: "socio",
+                name: "Démographie (Accueil)",
+                short: "Démographie",
+                unit: "hab/an",
+                value: 912,
+                target: 1350,
+                type: "higher",
+                icon: "fa-solid fa-people-group text-indigo-500",
+                note: "Nombre d'habitants accueillis par an. Source Cible: SCoT EIE p.22 (cible d'accueil de 27000 à 28000 habitants d'ici à 2040).",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "alimentation",
+                category: "socio",
+                name: "Risque précarité alimentaire",
+                short: "Alimentation",
+                unit: "niveau",
+                value: 4,
+                target: 3,
+                type: "lower",
+                icon: "fa-solid fa-utensils text-green-500",
+                note: "Niveau de risque de précarité alimentaire (4=Élevé, 3=Moyen). Source: territoiresfertiles.fr.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "eau_potable",
+                category: "socio",
+                name: "Rendement réseau eau potable",
+                short: "Eau Potable",
+                unit: "%",
+                value: 77,
+                target: 81,
+                type: "higher",
+                icon: "fa-solid fa-faucet-drip text-cyan-600",
+                note: "Rendement du réseau en eau potable (77% en 2018). Cible: 81% en 2025 (SCoT EIE p.22).",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "logement_social",
+                category: "socio",
+                name: "Part des logements sociaux",
+                short: "Log. Social",
+                unit: "%",
+                value: 12,
+                target: 20,
+                type: "higher",
+                icon: "fa-solid fa-building-user text-orange-500",
+                note: "Part des logements sociaux. Source: Contrat de ville 2024-2030 p.6. Cible: Objectif loi SRU.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "energie",
+                category: "socio",
+                name: "Précarité énergétique",
+                short: "Énergie",
+                unit: "% ménages",
+                value: 25,
+                target: 0,
+                type: "lower",
+                icon: "fa-solid fa-bolt text-yellow-500",
+                note: "Part des ménages susceptibles d'être en situation de précarité énergétique. Source: Sdiag SCoT EIE p.118.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "mobilites",
+                category: "socio",
+                name: "Investissement mobilités actives",
+                short: "Mobilités",
+                unit: "M€/an",
+                value: 2.1,
+                target: 2,
+                type: "higher",
+                icon: "fa-solid fa-bicycle text-teal-500",
+                note: "Millions d'euros investis annuellement dans les mobilités actives. Cible: Plan des mobilités actives (2022-2040).",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "sante_medecin",
+                category: "socio",
+                name: "Non couvert par médecin",
+                short: "Santé",
+                unit: "% pop.",
+                value: 2.30,
+                target: 1.70,
+                type: "lower",
+                icon: "fa-solid fa-user-doctor text-red-500",
+                note: "Part de la population non couverte par un médecin traitant. Source Valeur: Diag santé ARS 2024 p.19. Source Cible: Moyenne France.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "emploi_risque",
+                category: "socio",
+                name: "Emploi à risque (Transition)",
+                short: "Emploi",
+                unit: "%",
+                value: 12.80,
+                target: 0,
+                type: "lower",
+                icon: "fa-solid fa-industry text-slate-600",
+                note: "Taux d'emploi sur le territoire à risque en cas de transition énergétique. Source: territoiresaufutur.org.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "citoyennete_abstention",
+                category: "socio",
+                name: "Abstention (Municipales 1er tour)",
+                short: "Citoyenneté",
+                unit: "%",
+                value: 62.60,
+                target: 50,
+                type: "lower",
+                icon: "fa-solid fa-check-to-slot text-slate-500",
+                note: "Taux d'abstention au premier tour des municipales (Narbonne). Source: Observatoire des territoires.",
+                isHidden: false,
+                images: []
+            },
+            {
+                key: "education_eleves",
+                category: "socio",
+                name: "Élèves en action découverte",
+                short: "Éducation",
+                unit: "élèves",
+                value: 935,
+                target: 900,
+                type: "higher",
+                icon: "fa-solid fa-graduation-cap text-blue-500",
+                note: "Nombre d'élèves en action découverte avec les scolaires. Source: Donnée Grand Narbonne.",
+                isHidden: false,
+                images: []
+            }
+        ];
+
+        /*******************************************************
+         * 2. UTILITY FUNCTIONS
+         *******************************************************/
+        const getStatus = (value, target, type) => {
+            const safeType = type ? type.trim().toLowerCase() : 'lower';
+            const isHigher = safeType === 'higher';
+            if (isHigher) {
+                return value >= target ? 'success' : 'danger';
+            } else {
+                return value <= target ? 'success' : 'danger';
+            }
+        };
+
+        const getStatusColor = (status) => {
+            return status === 'success' ? COLORS.green : COLORS.red;
+        };
+
+        const calculateIndex = (value, target, type) => {
+            const safeType = type ? type.trim().toLowerCase() : 'lower';
+            const isHigher = safeType === 'higher';
+
+            if (!isHigher) { // Lower is better
+                if (target === 0) {
+                    return `${value.toFixed(1)} (valeur absolue)`;
+                }
+                const ratio = (value / target) * 100;
+                const capped = Math.min(ratio, 200);
+                return `${capped.toFixed(0)}% du seuil`;
+            } else { // Higher is better
+                if (target === 0) return 'N/A';
+                const ratio = (value / target) * 100;
+                const capped = Math.min(ratio, 100);
+                return `${capped.toFixed(0)}% de l’objectif`;
+            }
+        };
+
+        // --- ROBUST CSV PARSING LOGIC ---
+
+        const escapeCSV = (value) => {
+            const stringValue = String(value || '');
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+            }
+            return stringValue;
+        };
+
+        const generateCSV = (indicators) => {
+            const header = "key,category,name,short,unit,value,target,note,icon,type,isHidden";
+            const rows = indicators.map(ind =>
+                [
+                    ind.key, ind.category, ind.name, ind.short, ind.unit,
+                    ind.value, ind.target, ind.note, ind.icon, ind.type, ind.isHidden
+                ].map(escapeCSV).join(',')
+            );
+            return [header, ...rows].join('\n');
+        };
+
+        const parseCSV = (csvText) => {
+            const lines = csvText.trim().split(/\r?\n/);
+            if (lines.length < 2) return [];
+
+            return lines.slice(1).map(line => {
+                if (!line.trim()) return null;
+
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
+                         if (inQuotes && line[i+1] === '"') {
+                             current += '"';
+                             i++;
+                         } else {
+                             inQuotes = !inQuotes;
+                         }
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current);
+
+                let key, category, name, short, unit, valueStr, targetStr, note, icon, type, isHiddenStr;
+
+                if (values.length >= 11) {
+                     [key, category, name, short, unit, valueStr, targetStr, note, icon, type, isHiddenStr] = values;
+                } else if (values.length >= 10) {
+                     [key, category, name, short, unit, valueStr, targetStr, note, icon, type] = values;
+                } else if (values.length >= 9) {
+                     [key, name, short, unit, valueStr, targetStr, note, icon, type] = values;
+                     category = 'env';
+                } else {
+                     [key, name, unit, valueStr, targetStr, note, icon, type] = values;
+                     short = name;
+                     category = 'env';
+                }
+
+                const safeType = type?.trim().toLowerCase();
+                const finalType = (safeType === 'higher') ? 'higher' : 'lower';
+                const isHidden = isHiddenStr === 'true';
+
+                return {
+                    key: key?.trim() || '',
+                    category: category?.trim() || 'env',
+                    name: name?.trim() || '',
+                    short: short?.trim() || '',
+                    unit: unit?.trim() || '',
+                    value: parseFloat(valueStr || '0'),
+                    target: parseFloat(targetStr || '0'),
+                    note: note?.trim() || '',
+                    icon: icon?.trim() || '',
+                    type: finalType,
+                    isHidden: isHidden,
+                    images: [] // Reset images on import as CSV doesn't support them well
+                };
+            }).filter(Boolean);
+        };
+
+        const downloadCSV = (content, filename) => {
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        /*******************************************************
+         * 3. ICONS (Inline SVG Components for UI)
+         *******************************************************/
+        const Icons = {
+            Download: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            ),
+            Upload: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            ),
+            CheckCircle: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+            ),
+            AlertTriangle: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            ),
+            RefreshCw: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+                </svg>
+            ),
+            Save: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+            ),
+            X: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            ),
+            Plus: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            ),
+            Trash2: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            ),
+            Maximize: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+            ),
+            Minimize: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                     <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+                </svg>
+            ),
+            Image: ({ size = 24 }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+            )
+        };
+
+        const IconRenderer = ({ icon, className = "" }) => {
+            if (!icon) return null;
+            const isFontAwesome = icon.includes('fa-') || icon.includes('fas ') || icon.includes('fab ') || icon.includes('far ');
+            if (isFontAwesome) {
+                return <i className={`${icon} ${className}`}></i>;
+            }
+            return <span className={className}>{icon}</span>;
+        };
+
+        /*******************************************************
+         * 4. COMPONENTS
+         *******************************************************/
+
+        // --- Image Viewer Modal Component ---
+        const ImageViewer = ({ images, onClose }) => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [hasError, setHasError] = useState(false);
+
+            if (!images || images.length === 0) return null;
+
+            // Lock body scroll
+            useEffect(() => {
+                document.body.style.overflow = 'hidden';
+                return () => {
+                    document.body.style.overflow = 'unset';
+                };
+            }, []);
+
+            // Reset error on image change
+            useEffect(() => {
+                setHasError(false);
+            }, [currentIndex]);
+
+            const nextImage = (e) => {
+                e.stopPropagation();
+                setCurrentIndex((prev) => (prev + 1) % images.length);
+            };
+
+            const prevImage = (e) => {
+                e.stopPropagation();
+                setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+            };
+
+            const handleImageError = () => {
+                setHasError(true);
+            };
+
+            return (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn"
+                    onClick={onClose}
+                >
+                    <div className="relative w-full h-full max-w-5xl max-h-screen p-4 flex flex-col items-center justify-center">
+                        {/* Close Button */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 text-white hover:text-gray-300 z-50 bg-black/20 p-2 rounded-full backdrop-blur-md"
+                        >
+                            <Icons.X size={32} />
+                        </button>
+
+                        {/* Image Container */}
+                        <div
+                            className="relative max-w-full max-h-full flex items-center justify-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {!hasError ? (
+                                <img
+                                    src={images[currentIndex]}
+                                    alt={`Indicator view ${currentIndex + 1}`}
+                                    className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                                    onError={handleImageError}
+                                />
+                            ) : (
+                                <div className="bg-white/10 p-10 rounded-lg text-white text-center backdrop-blur-md border border-white/20">
+                                    <i className="fa-solid fa-triangle-exclamation text-4xl text-amber-400 mb-4"></i>
+                                    <h3 className="text-xl font-bold mb-2">Image introuvable</h3>
+                                    <p className="text-sm opacity-80 mb-4">Le fichier "{images[currentIndex]}" n'a pas été trouvé.</p>
+                                    <p className="text-xs opacity-60">Veuillez vérifier le nom du fichier ou importer l'image manuellement via le bouton d'édition.</p>
+                                </div>
+                            )}
+
+                            {/* Navigation Arrows */}
+                            {images.length > 1 && (
+                                <>
+                                    <button
+                                        onClick={prevImage}
+                                        className="absolute left-[-50px] top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 p-3 rounded-full backdrop-blur-md transition-all hidden md:block"
+                                    >
+                                        <i className="fa-solid fa-chevron-left text-2xl"></i>
+                                    </button>
+                                    <button
+                                        onClick={nextImage}
+                                        className="absolute right-[-50px] top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 p-3 rounded-full backdrop-blur-md transition-all hidden md:block"
+                                    >
+                                        <i className="fa-solid fa-chevron-right text-2xl"></i>
+                                    </button>
+
+                                    {/* Mobile Nav (Bottom) */}
+                                    <div className="absolute bottom-[-50px] left-0 w-full flex justify-center gap-4 md:hidden">
+                                        <button onClick={prevImage} className="p-3 bg-white/10 rounded-full text-white"><i className="fa-solid fa-chevron-left"></i></button>
+                                        <span className="text-white self-center">{currentIndex + 1} / {images.length}</span>
+                                        <button onClick={nextImage} className="p-3 bg-white/10 rounded-full text-white"><i className="fa-solid fa-chevron-right"></i></button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Caption/Counter for desktop */}
+                        {images.length > 1 && (
+                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 bg-black/40 px-3 py-1 rounded-full text-sm backdrop-blur-md hidden md:block">
+                                {currentIndex + 1} / {images.length}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SVG Chart Component ---
+        const SVGChart = ({ indicators, selectedKey, onSelect, readOnly = false, onSynthesis = null }) => {
+            const [viewMode, setViewMode] = useState('bar'); // 'bar' or 'donut'
+            const [hoverIndex, setHoverIndex] = useState(null);
+
+            const svgHeight = 500;
+            const svgWidth = 600;
+            const margin = { top: 100, bottom: 80, left: 20, right: 20 };
+            const graphHeight = svgHeight - margin.top - margin.bottom;
+            const graphWidth = svgWidth - margin.left - margin.right;
+
+            // Only show visible indicators in the chart
+            const visibleIndicators = indicators.filter(i => !i.isHidden);
+
+            if (visibleIndicators.length === 0) {
+                return (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-10 text-slate-400">
+                        <p>Aucun indicateur visible.</p>
+                        {onSynthesis && (
+                             <div className="absolute top-4 right-6 z-20 flex bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
+                                <button
+                                    onClick={onSynthesis}
+                                    className="p-2 rounded-md transition-all text-slate-400 hover:text-slate-600"
+                                    title="Vue de Synthèse"
+                                >
+                                    <i className="fa-solid fa-binoculars"></i>
+                                </button>
+                             </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // --- SCALING LOGIC ---
+            const maxDataValue = Math.max(
+                ...visibleIndicators.map(d => d.value),
+                ...visibleIndicators.map(d => d.target)
+            );
+            const maxRoot = Math.sqrt(maxDataValue || 1);
+            const maxLog = Math.log((maxDataValue || 0) + 1);
+
+            const getY = (val) => {
+                return (Math.sqrt(val) / maxRoot) * graphHeight;
+            };
+
+            const radiusMax = Math.min(svgWidth, svgHeight) / 2 - 100;
+            const centerX = svgWidth / 2;
+            const centerY = svgHeight / 2;
+            const innerRadius = 30;
+
+            const getRadius = (val) => {
+                if (val === 0) return 0;
+                return (Math.log(val + 1) / maxLog) * radiusMax;
+            };
+
+            const getPolarCoords = (r, angle) => {
+                return {
+                    x: r * Math.cos(angle),
+                    y: r * Math.sin(angle)
+                };
+            };
+
+            const getSegments = (ind) => {
+                const { value, target, type } = ind;
+                let segments = [];
+                const safeType = type ? type.trim().toLowerCase() : 'lower';
+                const isHigher = safeType === 'higher';
+
+                const pushSeg = (startVal, endVal, color) => {
+                    if (endVal <= startVal) return;
+                    segments.push({ start: startVal, end: endVal, color });
+                };
+
+                if (!isHigher) {
+                    if (value <= target) {
+                        pushSeg(0, value, COLORS.green);
+                    } else {
+                        pushSeg(0, target, COLORS.green);
+                        pushSeg(target, value, COLORS.red);
+                    }
+                } else {
+                    if (value < target) {
+                         pushSeg(0, value, COLORS.red);
+                    } else {
+                         pushSeg(0, value, COLORS.green);
+                    }
+                }
+                return segments;
+            };
+
+            const barCount = visibleIndicators.length;
+            const gapRatio = 0.4;
+            const itemWidth = graphWidth / barCount;
+            const barWidth = itemWidth * (1 - gapRatio);
+            const gap = itemWidth * gapRatio;
+
+            const wrapLabel = (text, maxLength = 10) => {
+                if (text.length <= maxLength) return [text];
+                const parts = text.split(' ');
+                const lines = [];
+                let currentLine = parts[0];
+                for (let i = 1; i < parts.length; i++) {
+                    if ((currentLine + " " + parts[i]).length <= maxLength + 3) {
+                         currentLine += " " + parts[i];
+                    } else {
+                         lines.push(currentLine);
+                         currentLine = parts[i];
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
+            };
+
+            const renderTooltip = (x, y, ind) => {
+                const tipWidth = 130;
+                const tipHeight = 52;
+                const arrowHeight = 8;
+                const radius = 6;
+                const boxBottom = y - arrowHeight;
+                const boxTop = boxBottom - tipHeight;
+                const boxLeft = x - tipWidth / 2;
+                const boxRight = x + tipWidth / 2;
+                const bubblePath = `M ${boxLeft + radius},${boxTop} H ${boxRight - radius} Q ${boxRight},${boxTop} ${boxRight},${boxTop + radius} V ${boxBottom - radius} Q ${boxRight},${boxBottom} ${boxRight - radius},${boxBottom} H ${x + arrowHeight} L ${x},${y} L ${x - arrowHeight},${boxBottom} H ${boxLeft + radius} Q ${boxLeft},${boxBottom} ${boxLeft},${boxBottom - radius} V ${boxTop + radius} Q ${boxLeft},${boxTop} ${boxLeft + radius},${boxTop} Z`;
+                return (
+                     <g pointerEvents="none" className="drop-shadow-lg z-50">
+                        <path d={bubblePath} fill="white" stroke="#cbd5e1" strokeWidth="1"/>
+                        <text x={x} y={boxTop + 16} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#334155">{ind.name}</text>
+                        <text x={x} y={boxTop + 33} textAnchor="middle" fontSize="14" fontWeight="bold" fill="#0f172a">
+                            {ind.value.toFixed(2).replace(/\.?0+$/, '')} <tspan fontSize="9" fill="#64748b" fontWeight="normal">{ind.unit}</tspan>
+                        </text>
+                        <text x={x} y={boxTop + 46} textAnchor="middle" fontSize="9" fill="#94a3b8">Cible: {ind.target}</text>
+                    </g>
+                );
+            }
+
+            return (
+                <div className="w-full h-full flex items-center justify-center p-4 relative">
+                    <div className="absolute top-4 right-6 z-20 flex bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <button onClick={() => setViewMode('bar')} className={`p-2 rounded-md transition-all ${viewMode === 'bar' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`} title="Vue Barres"><i className="fa-solid fa-chart-bar"></i></button>
+                        <button onClick={() => setViewMode('donut')} className={`p-2 rounded-md transition-all ${viewMode === 'donut' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`} title="Vue Radar/Donut"><i className="fa-solid fa-chart-pie"></i></button>
+                        {onSynthesis && (
+                             <>
+                                <div className="w-px bg-slate-200 mx-1 my-1"></div>
+                                <button onClick={onSynthesis} className="p-2 rounded-md transition-all text-slate-400 hover:text-slate-600 hover:bg-white hover:shadow-sm" title="Vue de Synthèse"><i className="fa-solid fa-binoculars"></i></button>
+                             </>
+                        )}
+                    </div>
+
+                    <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full max-h-full overflow-visible select-none" preserveAspectRatio="xMidYMid meet">
+                        {viewMode === 'bar' ? (
+                            <>
+                                <line x1={margin.left} y1={svgHeight - margin.bottom} x2={svgWidth - margin.right} y2={svgHeight - margin.bottom} stroke="#e2e8f0" strokeWidth="1" />
+                                {visibleIndicators.map((ind, i) => {
+                                    const segments = getSegments(ind);
+                                    const totalBarHeight = getY(ind.value);
+                                    const x = margin.left + (i * itemWidth) + (gap / 2);
+                                    const baseY = svgHeight - margin.bottom;
+                                    const topY = baseY - totalBarHeight;
+                                    const targetH = getY(ind.target);
+                                    const targetY = baseY - targetH;
+                                    const targetLineWidth = barWidth + 4;
+                                    const targetLineX1 = x + (barWidth - targetLineWidth) / 2;
+                                    const targetLineX2 = targetLineX1 + targetLineWidth;
+
+                                    const isSelected = !readOnly && ind.key === selectedKey;
+                                    const isHovered = i === hoverIndex;
+                                    const anchorX = x + barWidth / 2;
+                                    const anchorY = topY - 6;
+                                    const collisionThreshold = 15;
+                                    const isCollision = Math.abs(topY - targetY) < collisionThreshold;
+                                    const valueTextY = isCollision ? topY - 18 : topY - 8;
+                                    const isStaggered = i % 2 === 1;
+                                    const labelYBase = svgHeight - margin.bottom + 15;
+                                    const staggerOffset = 25;
+                                    const labelY = isStaggered ? labelYBase + staggerOffset : labelYBase;
+                                    const wrappedLabel = wrapLabel(ind.short, 10);
+
+                                    return (
+                                        <g
+                                            key={ind.key}
+                                            onClick={() => !readOnly && onSelect(ind.key)}
+                                            onMouseEnter={() => setHoverIndex(i)}
+                                            onMouseLeave={() => setHoverIndex(null)}
+                                            className={`${readOnly ? 'cursor-default' : 'cursor-pointer'} transition-opacity duration-200`}
+                                            style={{ opacity: (hoverIndex !== null && !isHovered) ? 0.6 : 1 }}
+                                        >
+                                            <rect x={x - gap/2} y={margin.top} width={itemWidth} height={graphHeight} fill="transparent" />
+                                            {segments.map((seg, idx) => {
+                                                const h = getY(seg.end) - getY(seg.start);
+                                                const yPos = baseY - getY(seg.end);
+                                                return (<rect key={idx} x={x} y={yPos} width={barWidth} height={h} fill={seg.color} fillOpacity="0.8" rx={0} />);
+                                            })}
+                                            {isSelected && (<rect x={x - 2} y={topY - 2} width={barWidth + 4} height={totalBarHeight + 4} fill="none" stroke={COLORS.blue} strokeWidth="2" rx="2" />)}
+                                            <line x1={targetLineX1} y1={targetY} x2={targetLineX2} y2={targetY} stroke="#333" strokeWidth="1" strokeDasharray="1 2" strokeLinecap="round" />
+                                            {!isHovered && (<text x={x + barWidth / 2} y={valueTextY} textAnchor="middle" fontSize="12" fontWeight="500" fill={COLORS.textMedium}>{ind.value.toFixed(1)}</text>)}
+                                            {isStaggered && (<line x1={x + barWidth / 2} y1={baseY} x2={x + barWidth / 2} y2={labelY - 12} stroke="#e2e8f0" strokeWidth="1" />)}
+                                            <text x={x + barWidth / 2} y={labelY} textAnchor="middle" fontSize="10" fontWeight="bold" fill={isSelected ? COLORS.blue : '#333'} style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                {wrappedLabel.map((line, idx) => (<tspan x={x + barWidth / 2} dy={idx === 0 ? 0 : 12} key={idx}>{line}</tspan>))}
+                                            </text>
+                                            {isHovered && renderTooltip(anchorX, anchorY, ind)}
+                                        </g>
+                                    );
+                                })}
+                            </>
+                        ) : (
+                            <g transform={`translate(${centerX}, ${centerY})`}>
+                                <circle r={radiusMax} fill="none" stroke="#f1f5f9" strokeWidth="1" />
+                                <circle r={radiusMax * 0.75} fill="none" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4"/>
+                                <circle r={radiusMax * 0.5} fill="none" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4"/>
+                                <circle r={radiusMax * 0.25} fill="none" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="4 4"/>
+                                <circle r={innerRadius} fill="white" stroke="#e2e8f0" strokeWidth="1" />
+                                {visibleIndicators.map((ind, i) => {
+                                    const segments = getSegments(ind);
+                                    const isSelected = !readOnly && ind.key === selectedKey;
+                                    const isHovered = i === hoverIndex;
+                                    const angleStep = (2 * Math.PI) / visibleIndicators.length;
+                                    const startAngle = i * angleStep - Math.PI / 2;
+                                    const endAngle = (i + 1) * angleStep - Math.PI / 2;
+                                    const midAngle = (startAngle + endAngle) / 2;
+                                    const padAngle = 0.05;
+                                    const effectiveStart = startAngle + padAngle;
+                                    const effectiveEnd = endAngle - padAngle;
+                                    const rValTotal = Math.max(innerRadius, getRadius(ind.value));
+                                    const rTarget = Math.max(innerRadius, getRadius(ind.target));
+                                    const labelR = radiusMax + 25;
+                                    const labelPos = getPolarCoords(labelR, midAngle);
+                                    const isRightSide = Math.cos(midAngle) >= 0;
+                                    const textAnchor = isRightSide ? "start" : "end";
+                                    const tipPos = getPolarCoords(rValTotal, midAngle);
+
+                                    return (
+                                        <g
+                                            key={ind.key}
+                                            onClick={() => !readOnly && onSelect(ind.key)}
+                                            onMouseEnter={() => setHoverIndex(i)}
+                                            onMouseLeave={() => setHoverIndex(null)}
+                                            className={`${readOnly ? 'cursor-default' : 'cursor-pointer'} transition-opacity duration-200`}
+                                            style={{ opacity: (hoverIndex !== null && !isHovered) ? 0.4 : 1 }}
+                                        >
+                                            {segments.map((seg, idx) => {
+                                                const rStart = Math.max(innerRadius, getRadius(seg.start));
+                                                const rEnd = Math.max(innerRadius, getRadius(seg.end));
+                                                const p1 = getPolarCoords(rEnd, effectiveEnd);
+                                                const p2 = getPolarCoords(rEnd, effectiveStart);
+                                                const p3 = getPolarCoords(rStart, effectiveStart);
+                                                const p4 = getPolarCoords(rStart, effectiveEnd);
+                                                const largeArcFlag = 0;
+                                                const dSlice = `M ${p3.x} ${p3.y} L ${p2.x} ${p2.y} A ${rEnd} ${rEnd} 0 ${largeArcFlag} 1 ${p1.x} ${p1.y} L ${p4.x} ${p4.y} A ${rStart} ${rStart} 0 ${largeArcFlag} 0 ${p3.x} ${p3.y} Z`;
+                                                return (<path key={idx} d={dSlice} fill={seg.color} fillOpacity="0.8" />);
+                                            })}
+                                            {isSelected && (() => {
+                                                const rStart = innerRadius;
+                                                const rEnd = rValTotal;
+                                                const p1 = getPolarCoords(rEnd, effectiveEnd);
+                                                const p2 = getPolarCoords(rEnd, effectiveStart);
+                                                const p3 = getPolarCoords(rStart, effectiveStart);
+                                                const p4 = getPolarCoords(rStart, effectiveEnd);
+                                                const largeArcFlag = 0;
+                                                const dOutline = `M ${p3.x} ${p3.y} L ${p2.x} ${p2.y} A ${rEnd} ${rEnd} 0 ${largeArcFlag} 1 ${p1.x} ${p1.y} L ${p4.x} ${p4.y} A ${rStart} ${rStart} 0 ${largeArcFlag} 0 ${p3.x} ${p3.y} Z`;
+                                                return (<path d={dOutline} fill="none" stroke={COLORS.blue} strokeWidth="2" />);
+                                            })()}
+                                            {(() => {
+                                                const t1 = getPolarCoords(rTarget, effectiveStart);
+                                                const t2 = getPolarCoords(rTarget, effectiveEnd);
+                                                const dTarget = `M ${t1.x} ${t1.y} A ${rTarget} ${rTarget} 0 0 1 ${t2.x} ${t2.y}`;
+                                                return (<path d={dTarget} fill="none" stroke="#333" strokeWidth="1" strokeDasharray="1 2" strokeLinecap="round" />);
+                                            })()}
+                                            <text x={labelPos.x} y={labelPos.y} textAnchor={textAnchor} fontSize="11" fontWeight="bold" fill={isSelected ? COLORS.blue : "#475569"} alignmentBaseline="middle" style={{ textTransform: 'uppercase' }}>{ind.short}</text>
+                                            <line x1={getPolarCoords(radiusMax + 5, midAngle).x} y1={getPolarCoords(radiusMax + 5, midAngle).y} x2={getPolarCoords(radiusMax + 20, midAngle).x} y2={getPolarCoords(radiusMax + 20, midAngle).y} stroke="#cbd5e1" strokeWidth="1" />
+                                            {isHovered && renderTooltip(tipPos.x, tipPos.y - 10, ind)}
+                                        </g>
+                                    );
+                                })}
+                            </g>
+                        )}
+                    </svg>
+                </div>
+            );
+        };
+
+        // --- Detail Panel Component ---
+        const DetailPanel = ({
+            allIndicators,
+            visibleIndicators,
+            selectedKey,
+            onSelect,
+            onUpdate,
+            isEditMode,
+            setEditMode,
+            onReset,
+            activeCategory,
+            onRequestCategoryChange,
+            pollutionTab,
+            setPollutionTab,
+            onAddIndicator,
+            onDeleteIndicator
+        }) => {
+            const categoryIndicators = allIndicators.filter(i => i.category === activeCategory);
+
+            const getDisplayList = () => {
+                const list = [];
+                const env = activeCategory === 'env';
+                const azote = categoryIndicators.find(i => i.key === 'azote');
+                const phosphore = categoryIndicators.find(i => i.key === 'phosphore');
+
+                if (env && azote && phosphore) {
+                    const combined = {
+                        key: 'pollution_combined',
+                        short: 'Pollution Eau',
+                        icon: 'fa-solid fa-water text-cyan-600',
+                        isHidden: azote.isHidden && phosphore.isHidden,
+                        value: (azote.value + phosphore.value)/2,
+                        target: (azote.target + phosphore.target)/2,
+                        type: 'lower'
+                    };
+                    categoryIndicators.forEach(ind => {
+                        if (ind.key === 'azote' || ind.key === 'phosphore') return;
+                        list.push(ind);
+                    });
+                    const idx = list.findIndex(i => i.key === 'eau');
+                    if (idx !== -1) list.splice(idx + 1, 0, combined);
+                    else list.push(combined);
+                } else {
+                    return categoryIndicators;
+                }
+                return list;
+            };
+
+            const displayList = getDisplayList();
+            const fileInputRef = useRef(null);
+            const imageInputRef = useRef(null);
+
+            // LOCAL STATE FOR EDITING
+            const [localState, setLocalState] = useState(null);
+            const [saveSuccess, setSaveSuccess] = useState(false);
+            const [showImageViewer, setShowImageViewer] = useState(false);
+
+            const isPollutionCombined = selectedKey === 'pollution_combined';
+            const isPollutionCalculated = isPollutionCombined && pollutionTab === 'avg';
+
+            const getSourceIndicator = () => {
+                if (isPollutionCombined) {
+                    if (pollutionTab === 'avg') {
+                         const azote = allIndicators.find(i => i.key === 'azote');
+                         const phosphore = allIndicators.find(i => i.key === 'phosphore');
+                         if (azote && phosphore) {
+                             return {
+                                 key: 'pollution_combined',
+                                 name: "Pollution de l'eau (Moyenne)",
+                                 short: "Pollution Eau",
+                                 unit: "% mesures",
+                                 value: (azote.value + phosphore.value)/2,
+                                 target: (azote.target + phosphore.target)/2,
+                                 type: 'lower',
+                                 icon: "fa-solid fa-water text-cyan-600",
+                                 note: "Moyenne des risques d'eutrophisation Azote et Phosphore.",
+                                 isHidden: azote.isHidden && phosphore.isHidden,
+                                 category: 'env',
+                                 images: []
+                             };
+                         }
+                    } else {
+                        return allIndicators.find(i => i.key === pollutionTab);
+                    }
+                }
+                return allIndicators.find(i => i.key === selectedKey);
+            };
+
+            const sourceIndicator = getSourceIndicator();
+
+            useEffect(() => {
+                if (sourceIndicator) {
+                    setLocalState({ ...sourceIndicator });
+                } else {
+                    setLocalState(null);
+                }
+            }, [selectedKey, pollutionTab, allIndicators]);
+
+            // Calculate if there are unsaved changes
+            const hasChanges = localState && sourceIndicator && JSON.stringify(localState) !== JSON.stringify(sourceIndicator);
+
+            // Handler for category switch with safety check
+            const handleCategorySwitch = (newCategory) => {
+                if (hasChanges && !isPollutionCalculated) {
+                     if (!window.confirm("Vous avez des modifications non enregistrées. Voulez-vous changer de catégorie et perdre vos modifications ?")) {
+                         return; // Abort switch
+                     }
+                }
+                onRequestCategoryChange(newCategory);
+            };
+
+            const handleLocalChange = (field, value) => {
+                setLocalState(prev => ({ ...prev, [field]: value }));
+                setSaveSuccess(false);
+            };
+
+            const handleApplyChanges = () => {
+                const targetKey = isPollutionCombined && pollutionTab !== 'avg' ? pollutionTab : localState.key;
+
+                if (isPollutionCombined && pollutionTab === 'avg') return;
+
+                const globalIndex = allIndicators.findIndex(i => i.key === targetKey);
+                if (globalIndex !== -1) {
+                    const updated = [...allIndicators];
+                    updated[globalIndex] = localState;
+                    onUpdate(updated, targetKey);
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 2000);
+                }
+            };
+
+            const handleCancelChanges = () => {
+                 setLocalState({ ...sourceIndicator });
+            };
+
+            const handleToggleHide = () => {
+                const newValue = !localState.isHidden;
+
+                if (isPollutionCombined && pollutionTab === 'avg') {
+                     const updated = allIndicators.map(ind => {
+                         if (ind.key === 'azote' || ind.key === 'phosphore') {
+                             return { ...ind, isHidden: newValue };
+                         }
+                         return ind;
+                     });
+                     onUpdate(updated);
+                } else {
+                    const targetKey = localState.key;
+                    const globalIndex = allIndicators.findIndex(i => i.key === targetKey);
+                     if (globalIndex !== -1) {
+                        const updated = [...allIndicators];
+                        updated[globalIndex] = { ...updated[globalIndex], isHidden: newValue };
+                        onUpdate(updated, targetKey);
+                    }
+                }
+                handleLocalChange('isHidden', newValue);
+            };
+
+            const handleChipSelect = (ind) => {
+                onSelect(ind.key);
+                if (ind.key === 'pollution_combined') setPollutionTab('avg');
+                if (ind.isHidden) {
+                    setEditMode(true);
+                }
+            };
+
+            const handleDeleteCurrent = () => {
+                 if (isPollutionCombined && pollutionTab === 'avg') {
+                     if (window.confirm("Supprimer l'indicateur Pollution de l'eau (Azote + Phosphore) ?")) {
+                         const updated = allIndicators.filter(i => i.key !== 'azote' && i.key !== 'phosphore');
+                         onUpdate(updated);
+                         const remaining = updated.filter(i => i.category === activeCategory);
+                         if (remaining.length > 0) onSelect(remaining[0].key);
+                         else onSelect(null);
+                     }
+                 } else if (localState && localState.key) {
+                     onDeleteIndicator(localState.key);
+                 }
+            };
+
+            // --- Image Handling ---
+            const handleAddImage = (e) => {
+                const file = e.target.files?.[0];
+                if (file && localState) {
+                    const url = URL.createObjectURL(file);
+                    const newImages = [...(localState.images || []), url];
+                    handleLocalChange('images', newImages);
+                }
+                e.target.value = '';
+            };
+
+            const handleRemoveImage = (index) => {
+                if (localState && localState.images) {
+                    const newImages = [...localState.images];
+                    newImages.splice(index, 1);
+                    handleLocalChange('images', newImages);
+                }
+            };
+
+            const handleExport = () => {
+                const csv = generateCSV(allIndicators);
+                downloadCSV(csv, 'gn_dashboard_indicators.csv');
+            };
+
+            const handleImport = (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const parsed = parseCSV(evt.target.result);
+                            if (parsed.length > 0) {
+                                onUpdate(parsed);
+                            } else {
+                                alert("Erreur de format ou fichier vide.");
+                            }
+                        } catch (err) {
+                            alert("Erreur lors de l'import CSV.");
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+                e.target.value = '';
+            };
+
+            if (!localState) return <div className="p-6">Aucun indicateur sélectionné.</div>;
+
+            const renderState = localState;
+            const status = getStatus(renderState.value, renderState.target, renderState.type);
+            const statusColor = getStatusColor(status);
+            const statusLabel = status === 'success'
+                ? (renderState.type === 'higher' ? "Objectif atteint" : "Dans le seuil")
+                : (renderState.type === 'higher' ? "En dessous de l’objectif" : "Au-delà du seuil");
+            const isHidden = renderState?.isHidden;
+
+            const showActions = !isPollutionCombined || (isPollutionCombined && pollutionTab === 'avg');
+
+            const isInputDisabled = isPollutionCalculated || isHidden;
+
+            // CHECK FOR IMAGES
+            const indicatorImages = renderState.images || [];
+            const hasImages = indicatorImages.length > 0;
+
+            return (
+                <div className="bg-white rounded-[20px] p-6 shadow-sm border border-slate-100 flex flex-col h-full min-h-[400px]">
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-6 shrink-0">
+                        <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2">INDICATEURS</h2>
+                        <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200">
+                            <button onClick={() => setEditMode(false)} className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${!isEditMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Visualisation</button>
+                            <button onClick={() => setEditMode(true)} className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${isEditMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Édition</button>
+                        </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-4 mb-6 border-b border-slate-100 pb-2 shrink-0">
+                        <label className={`flex items-center gap-2 cursor-pointer transition-opacity ${activeCategory === 'env' ? 'opacity-100' : 'opacity-50 hover:opacity-80'}`}>
+                            <input type="radio" name="cat" checked={activeCategory === 'env'} onChange={() => handleCategorySwitch('env')} className="accent-slate-800 w-4 h-4" />
+                            <span className="text-sm font-medium text-slate-700">Environnementaux</span>
+                        </label>
+                        <label className={`flex items-center gap-2 cursor-pointer transition-opacity ${activeCategory === 'socio' ? 'opacity-100' : 'opacity-50 hover:opacity-80'}`}>
+                            <input type="radio" name="cat" checked={activeCategory === 'socio'} onChange={() => handleCategorySwitch('socio')} className="w-4 h-4 accent-slate-800" />
+                            <span className="text-sm font-medium text-slate-700">Socio-économiques</span>
+                        </label>
+                    </div>
+
+                    {/* Chips */}
+                    <div className="flex flex-wrap gap-2 mb-8 shrink-0 items-center">
+                        {displayList.map((ind, i) => {
+                            const isActive = selectedKey === ind.key;
+                            const s = getStatus(ind.value, ind.target, ind.type);
+                            const dotColor = getStatusColor(s);
+                            return (
+                                <button key={ind.key} onClick={() => handleChipSelect(ind)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${isActive ? 'bg-slate-800 text-white border-slate-800 shadow-md ring-2 ring-slate-200 ring-offset-1' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'} ${ind.isHidden ? 'opacity-60 grayscale bg-slate-100' : ''}`}>
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dotColor }}></span>
+                                    <IconRenderer icon={ind.icon} />
+                                    <span>{ind.short}</span>
+                                    {ind.isHidden && <i className="fa-solid fa-eye-slash text-[10px] ml-1"></i>}
+                                </button>
+                            );
+                        })}
+                        <button onClick={onAddIndicator} className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-500 flex items-center justify-center transition-all" title="Ajouter un nouvel indicateur"><Icons.Plus size={14} /></button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto pr-2 flex flex-col">
+                        {!isEditMode ? (
+                            <div className="space-y-6">
+                                {isPollutionCombined && (
+                                    <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-6">
+                                        <button onClick={() => setPollutionTab('avg')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'avg' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Moyenne</button>
+                                        <button onClick={() => setPollutionTab('azote')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'azote' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Azote</button>
+                                        <button onClick={() => setPollutionTab('phosphore')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'phosphore' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Phosphore</button>
+                                    </div>
+                                )}
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><IconRenderer icon={renderState.icon} /> {renderState.name}</h3>
+                                        <p className="text-slate-500 text-sm mt-1">{renderState.unit}</p>
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1`} style={{ color: statusColor, borderColor: statusColor, backgroundColor: status === 'success' ? '#f0fdf4' : '#fef2f2' }}>
+                                        {status === 'success' ? <Icons.CheckCircle size={14}/> : <Icons.AlertTriangle size={14}/>}{statusLabel}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-4 rounded-[16px]">
+                                        <p className="text-xs text-slate-500 font-bold uppercase mb-1">Valeur Actuelle</p>
+                                        <p className="text-2xl font-mono font-bold text-slate-700">{renderState.value.toFixed(2).replace(/\.?0+$/, '')}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-[16px]">
+                                        <p className="text-xs text-slate-500 font-bold uppercase mb-1">Cible (Objectif)</p>
+                                        <p className="text-2xl font-mono font-bold text-slate-700">{renderState.target}</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-[16px] flex justify-between items-center">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="text-xs text-slate-500 font-bold uppercase">Indice de performance</p>
+                                            <span className="text-xs font-medium text-slate-400 mr-2">{renderState.type === 'lower' ? 'Lower is better' : 'Higher is better'}</span>
+                                        </div>
+                                        <p className="text-xl font-bold" style={{ color: statusColor }}>{calculateIndex(renderState.value, renderState.target, renderState.type)}</p>
+                                    </div>
+                                    {hasImages && (
+                                        <button
+                                            onClick={() => setShowImageViewer(true)}
+                                            className="ml-4 w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 shadow-sm flex items-center justify-center transition-all"
+                                            title="Voir les données détaillées"
+                                        >
+                                            <i className="fa-solid fa-image text-lg"></i>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-4"><p className="text-sm text-slate-600 italic leading-relaxed">"{renderState.note}"</p></div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-full animate-in fade-in duration-300">
+                                <div className="shrink-0 flex justify-between items-center border-b border-slate-100 pb-2 mb-4 bg-white z-10">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-lg font-bold text-slate-800">Modifier l'indicateur</h3>
+                                        {showActions && (
+                                            <>
+                                            <button onClick={handleToggleHide} className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isHidden ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title={isHidden ? "Afficher l'indicateur" : "Masquer l'indicateur"}><i className={`fa-solid ${isHidden ? 'fa-eye' : 'fa-eye-slash'} text-xs`}></i></button>
+                                            <button onClick={handleDeleteCurrent} className="w-8 h-8 rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center transition-colors" title="Supprimer l'indicateur"><i className="fa-solid fa-trash-can text-xs"></i></button>
+                                            </>
+                                        )}
+                                    </div>
+                                    {hasChanges && (<span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-full">Non enregistré</span>)}
+                                </div>
+
+                                {isPollutionCalculated && (
+                                     <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg mb-4 border border-blue-100"><i className="fa-solid fa-info-circle mr-2"></i>La vue "Moyenne" est calculée automatiquement. Sélectionnez "Azote" ou "Phosphore" ci-dessus pour modifier les données sources.</div>
+                                )}
+                                {isHidden && (
+                                     <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg mb-4 border border-amber-100"><i className="fa-solid fa-eye-slash mr-2"></i>Cet indicateur est masqué. Activez-le pour modifier ses valeurs.</div>
+                                )}
+                                {isPollutionCombined && (
+                                    <div className="bg-slate-100 p-1 rounded-lg flex gap-1 mb-6">
+                                        <button onClick={() => setPollutionTab('avg')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'avg' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Moyenne</button>
+                                        <button onClick={() => setPollutionTab('azote')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'azote' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Azote</button>
+                                        <button onClick={() => setPollutionTab('phosphore')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${pollutionTab === 'phosphore' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>Phosphore</button>
+                                    </div>
+                                )}
+
+                                <div className={`flex-1 overflow-y-auto space-y-5 pb-4 ${isInputDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Titre complet</label><input type="text" value={localState?.name || ''} disabled={isInputDisabled} onChange={(e) => handleLocalChange('name', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-400 transition-colors ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Titre court (Graphique)</label><input type="text" value={localState?.short || ''} disabled={isInputDisabled} onChange={(e) => handleLocalChange('short', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-blue-400 transition-colors ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unité</label><input type="text" value={localState?.unit || ''} disabled={isInputDisabled} onChange={(e) => handleLocalChange('unit', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-blue-400 transition-colors ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valeur</label><input type="number" step="0.01" value={localState?.value || 0} disabled={isInputDisabled} onChange={(e) => handleLocalChange('value', parseFloat(e.target.value))} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 font-mono focus:outline-none focus:border-blue-400 transition-colors ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cible</label><input type="number" step="0.01" value={localState?.target || 0} disabled={isInputDisabled} onChange={(e) => handleLocalChange('target', parseFloat(e.target.value))} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 font-mono focus:outline-none focus:border-blue-400 transition-colors ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                    </div>
+                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type d'objectif</label><select value={localState?.type || 'lower'} disabled={isInputDisabled} onChange={(e) => handleLocalChange('type', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:border-blue-400 ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}><option value="lower">Lower is better (Moins c'est mieux)</option><option value="higher">Higher is better (Plus c'est mieux)</option></select></div>
+                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Catégorie</label><select value={localState?.category || 'env'} disabled={isInputDisabled} onChange={(e) => handleLocalChange('category', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:border-blue-400 ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}><option value="env">Environnemental</option><option value="socio">Socio-économique</option></select></div>
+                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Icône & Couleur</label><input type="text" value={localState?.icon || ''} disabled={isInputDisabled} onChange={(e) => handleLocalChange('icon', e.target.value)} placeholder="ex: fa-solid fa-tree text-green-500" className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:border-blue-400 font-mono ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+                                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Note explicative</label><textarea rows={3} value={localState?.note || ''} disabled={isInputDisabled} onChange={(e) => handleLocalChange('note', e.target.value)} className={`w-full p-3 border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:border-blue-400 ${isInputDisabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50'}`}/></div>
+
+                                    {/* Image Management Section */}
+                                    {!isPollutionCalculated && (
+                                        <div className="border-t border-slate-100 pt-4 mt-2">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase">Images de référence</label>
+                                                <button onClick={() => imageInputRef.current?.click()} className="text-xs font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1"><Icons.Plus size={12}/> Ajouter</button>
+                                                <input type="file" accept="image/*" ref={imageInputRef} className="hidden" onChange={handleAddImage} />
+                                            </div>
+                                            {indicatorImages.length > 0 ? (
+                                                <div className="flex gap-2 overflow-x-auto pb-2">
+                                                    {indicatorImages.map((img, idx) => (
+                                                        <div key={idx} className="relative w-16 h-16 shrink-0 rounded-lg border border-slate-200 overflow-hidden group">
+                                                            <img src={img} alt="Ref" className="w-full h-full object-cover" />
+                                                            <button onClick={() => handleRemoveImage(idx)} className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"><Icons.Trash2 size={16}/></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-slate-400 italic">Aucune image associée.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="shrink-0 flex flex-col gap-3 pt-4 border-t border-slate-100 mt-2 bg-white">
+                                    <div className="flex gap-2">
+                                        <button onClick={handleApplyChanges} disabled={!hasChanges || isInputDisabled} className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl transition-all font-bold text-xs uppercase tracking-wide ${saveSuccess ? 'bg-green-500 text-white' : hasChanges && !isInputDisabled ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>{saveSuccess ? (<><Icons.CheckCircle size={16}/> Modifications enregistrées !</>) : (<><Icons.Save size={16}/> Appliquer</>)}</button>
+                                        {hasChanges && (<button onClick={handleCancelChanges} className="px-3 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors" title="Annuler les modifications"><Icons.X size={20} /></button>)}
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <button onClick={() => {if (window.confirm("Réinitialiser cet indicateur aux valeurs par défaut ?")) {const targetKey = isPollutionCombined && pollutionTab !== 'avg' ? pollutionTab : localState.key;const original = DEFAULT_INDICATORS.find(d => d.key === targetKey);if (original) {const globalIndex = allIndicators.findIndex(i => i.key === targetKey);if (globalIndex !== -1) {const updated = [...allIndicators];updated[globalIndex] = { ...original };onUpdate(updated, targetKey);setLocalState({ ...original });}}}}} disabled={isInputDisabled} className={`text-[10px] font-bold flex items-center gap-1 transition-colors ${isInputDisabled ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-slate-600'}`}><Icons.RefreshCw size={12} /> Réinitialiser valeurs</button>
+                                        <button onClick={onReset} className="text-[10px] font-bold text-red-300 hover:text-red-500 uppercase tracking-wide ml-auto">Tout Réinitialiser (Usine)</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-2 gap-3 shrink-0">
+                        <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImport} />
+                        <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-slate-50 transition-colors"><Icons.Upload size={16} /> Importer CSV</button>
+                        <button onClick={handleExport} className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-slate-700 transition-all shadow-lg shadow-slate-200"><Icons.Download size={16} /> Exporter CSV</button>
+                    </div>
+
+                    {/* Image Viewer Modal */}
+                    {showImageViewer && hasImages && (
+                        <ImageViewer images={indicatorImages} onClose={() => setShowImageViewer(false)} />
+                    )}
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+        const App = () => {
+            const [indicators, setIndicators] = useState(DEFAULT_INDICATORS);
+            // We use a KEY based selection now to be robust against reordering/hiding
+            const [selectedKey, setSelectedKey] = useState(null);
+            const [activeCategory, setActiveCategory] = useState('env');
+            const [isEditMode, setEditMode] = useState(false);
+            const [pollutionTab, setPollutionTab] = useState('avg'); // 'avg', 'azote', 'phosphore'
+            const [isSynthesisMode, setSynthesisMode] = useState(false);
+
+            // Initial selection logic
+            useEffect(() => {
+                selectFirstVisible(activeCategory);
+            }, []);
+
+            const selectFirstVisible = (category) => {
+                // Prioritize finding a visible one
+                let first = indicators.find(i => i.category === category && !i.isHidden && i.key !== 'azote' && i.key !== 'phosphore');
+
+                // Special case for pollution if avg is visible (requires azote OR phosphore visible? No, avg implies combined)
+                // If azote/phosphore hidden, combined is hidden.
+                if (category === 'env' && !first) {
+                     const azote = indicators.find(i => i.key === 'azote');
+                     const phosphore = indicators.find(i => i.key === 'phosphore');
+                     if (azote && phosphore && (!azote.isHidden || !phosphore.isHidden)) {
+                         setSelectedKey('pollution_combined');
+                         return;
+                     }
+                }
+
+                // If no visible found, select ANY (even hidden) to avoid empty panel
+                if (!first) {
+                    first = indicators.find(i => i.category === category && i.key !== 'azote' && i.key !== 'phosphore');
+                }
+
+                if (first) setSelectedKey(first.key);
+                else if (category === 'env') setSelectedKey('pollution_combined'); // Fallback
+                else setSelectedKey(null);
+            };
+
+            const handleRequestCategoryChange = (newCategory) => {
+                setActiveCategory(newCategory);
+                selectFirstVisible(newCategory);
+                // Reset pollution tab default
+                if (newCategory === 'env') setPollutionTab('avg');
+            };
+
+            const handleUpdateIndicators = (updated, targetKey) => {
+                setIndicators(updated);
+                // If targetKey provided, keep it selected even if it was hidden
+                if (targetKey) setSelectedKey(targetKey);
+            };
+
+            const handleSelect = (key) => {
+                setSelectedKey(key);
+            };
+
+            const handleAddIndicator = () => {
+                const newKey = `custom_${Date.now()}`;
+                const newIndicator = {
+                    key: newKey,
+                    category: activeCategory,
+                    name: "Nouvel Indicateur",
+                    short: "Nouveau",
+                    unit: "unité",
+                    value: 10,
+                    target: 10,
+                    type: "higher",
+                    icon: "fa-solid fa-circle-question text-slate-400",
+                    note: "Description de l'indicateur...",
+                    isHidden: false,
+                    images: []
+                };
+                const updated = [...indicators, newIndicator];
+                setIndicators(updated);
+                setSelectedKey(newKey);
+                setEditMode(true);
+            };
+
+            const handleDeleteIndicator = (key) => {
+                if (window.confirm("Êtes-vous sûr de vouloir supprimer cet indicateur ?")) {
+                    const updated = indicators.filter(i => i.key !== key);
+                    setIndicators(updated);
+                    // Select another one
+                    const remaining = updated.filter(i => i.category === activeCategory);
+                    if (remaining.length > 0) {
+                        // try to find visible
+                        const visible = remaining.find(i => !i.isHidden && i.key !== 'azote' && i.key !== 'phosphore');
+                        if (visible) setSelectedKey(visible.key);
+                        else if (activeCategory === 'env') setSelectedKey('pollution_combined');
+                        else setSelectedKey(remaining[0].key);
+                    } else {
+                        setSelectedKey(null);
+                    }
+                }
+            };
+
+            const handleReset = () => {
+                if (window.confirm("ATTENTION : Cela effacera tous les indicateurs personnalisés et rétablira les valeurs d'usine. Continuer ?")) {
+                    setIndicators(DEFAULT_INDICATORS);
+                    // Force re-selection to avoid stale key
+                    setTimeout(() => selectFirstVisible(activeCategory), 0);
+                }
+            };
+
+            // PREPARE DATA FOR CHART (Merge logic)
+            const getChartIndicators = (category) => {
+                const catInds = indicators.filter(i => i.category === category);
+                const azote = indicators.find(i => i.key === 'azote');
+                const phosphore = indicators.find(i => i.key === 'phosphore');
+
+                const merged = [];
+                let pollutionAdded = false;
+
+                // We iterate original list to preserve order
+                catInds.forEach(ind => {
+                    if (ind.key === 'azote' || ind.key === 'phosphore') {
+                        if (!pollutionAdded && category === 'env' && azote && phosphore) {
+                             // Determine value based on selection
+                             let val = (azote.value + phosphore.value) / 2;
+                             let tgt = (azote.target + phosphore.target) / 2;
+                             let name = "Pollution Eau";
+
+                             // Visual feedback: if specific one selected in DetailPanel, chart shows it?
+                             // Requirement: "se o usuario selecionar azote ou phosphore, a barra continua em pollution de l'eau, mas atualiza o grafico para o valor que esta selecionado"
+                             if (selectedKey === 'pollution_combined') {
+                                 if (pollutionTab === 'azote') { val = azote.value; tgt = azote.target; }
+                                 if (pollutionTab === 'phosphore') { val = phosphore.value; tgt = phosphore.target; }
+                             }
+
+                             merged.push({
+                                 key: 'pollution_combined',
+                                 short: 'Pollution Eau',
+                                 name: name,
+                                 value: val,
+                                 target: tgt,
+                                 unit: '%',
+                                 type: 'lower',
+                                 category: 'env',
+                                 isHidden: azote.isHidden && phosphore.isHidden
+                             });
+                             pollutionAdded = true;
+                        }
+                    } else {
+                        merged.push(ind);
+                    }
+                });
+                return merged;
+            };
+
+            const chartIndicators = getChartIndicators(activeCategory);
+
+            if (isSynthesisMode) {
+                const chartIndicatorsEnv = getChartIndicators('env');
+                const chartIndicatorsSocio = getChartIndicators('socio');
+                return (
+                    <div className="fixed inset-0 bg-[#f8f9fa] z-50 flex flex-col p-4 animate-fadeIn overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4 shrink-0">
+                            <h1 className="text-xl font-bold text-slate-800">Vue de Synthèse</h1>
+                            <button onClick={() => setSynthesisMode(false)} className="px-4 py-2 bg-white rounded-lg shadow-sm border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">
+                                <i className="fa-solid fa-arrow-left mr-2"></i> Quitter la synthèse
+                            </button>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-4 min-h-0">
+                             <div className="flex-1 bg-white rounded-[24px] shadow-sm border border-slate-100 p-4 min-h-[400px] flex flex-col">
+                                 <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Indicateurs Environnementaux</h2>
+                                 <div className="flex-1 min-h-0">
+                                     <SVGChart indicators={chartIndicatorsEnv} selectedKey={null} onSelect={() => {}} readOnly={true} />
+                                 </div>
+                             </div>
+                             <div className="flex-1 bg-white rounded-[24px] shadow-sm border border-slate-100 p-4 min-h-[400px] flex flex-col">
+                                 <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Indicateurs Socio-économiques</h2>
+                                 <div className="flex-1 min-h-0">
+                                     <SVGChart indicators={chartIndicatorsSocio} selectedKey={null} onSelect={() => {}} readOnly={true} />
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-[#f8f9fa] p-4 md:p-8 font-sans text-slate-900">
+                    <div className="max-w-7xl mx-auto h-auto md:h-[90vh] flex flex-col md:flex-row gap-6">
+
+                        {/* Left Column - Graph */}
+                        <div className="flex-1 bg-white rounded-[24px] shadow-sm border border-slate-100 relative flex flex-col overflow-hidden min-h-[500px]">
+                            <div className="absolute top-6 left-6 z-10 flex items-center gap-3">
+                                <div>
+                                    <h1 className="text-lg md:text-xl font-bold text-slate-800">
+                                        Grand Narbonne
+                                        <span className="block text-sm font-normal text-slate-500">Tableau de bord environnemental</span>
+                                    </h1>
+                                </div>
+                                <span className="bg-slate-100 text-slate-500 text-[10px] uppercase px-2 py-1 rounded-full tracking-wider font-semibold border border-slate-200">Prototype</span>
+                            </div>
+
+                            {/* Legend in Header */}
+                            <div className="absolute top-20 left-6 z-10 flex gap-4 text-[10px] font-bold uppercase tracking-wider">
+                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#77dd77]"></span> Bon</div>
+                                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#f05757]"></span> Écart</div>
+                                <div className="flex items-center gap-1"><span className="w-4 h-0 border-t border-dashed border-slate-400"></span> Cible</div>
+                            </div>
+
+                            <div className="flex-1 flex items-center justify-center relative min-h-0">
+                                <SVGChart
+                                    indicators={chartIndicators}
+                                    selectedKey={selectedKey}
+                                    onSelect={handleSelect}
+                                    onSynthesis={() => setSynthesisMode(true)}
+                                />
+                            </div>
+
+                            <div className="absolute bottom-4 left-0 w-full text-center pb-4 pointer-events-none">
+                                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Hauteur des barres : √Valeur | Radar : Logarithmique</p>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Controls */}
+                        <div className="w-full md:w-[420px] shrink-0 h-auto md:h-full flex flex-col min-h-0">
+                            <DetailPanel
+                                allIndicators={indicators}
+                                visibleIndicators={chartIndicators} // Not strictly used inside but good for reference
+                                selectedKey={selectedKey}
+                                onSelect={handleSelect}
+                                onUpdate={handleUpdateIndicators}
+                                isEditMode={isEditMode}
+                                setEditMode={setEditMode}
+                                onReset={handleReset}
+                                activeCategory={activeCategory}
+                                onRequestCategoryChange={handleRequestCategoryChange}
+                                pollutionTab={pollutionTab}
+                                setPollutionTab={setPollutionTab}
+                                onAddIndicator={handleAddIndicator}
+                                onDeleteIndicator={handleDeleteIndicator}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    <!-- Logos partenaires (petits, alignés horizontalement en bas à droite) -->
+<div class="fixed bottom-4 right-4 flex flex-row items-center gap-3 z-[2000]">
+    <img src="pepr_vdbi.png" alt="France 2030" class="h-6 opacity-90 hover:opacity-100">
+    <img src="anr.jpg" alt="ANR" class="h-6 opacity-90 hover:opacity-100">
+    <img src="cnrs.png" alt="CNRS" class="h-6 opacity-90 hover:opacity-100">
+    <img src="logo_uge.png" alt="Université Gustave Eiffel" class="h-6 opacity-90 hover:opacity-100">
+</div>
+
+</body>
+</html>
